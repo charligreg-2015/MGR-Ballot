@@ -105,6 +105,15 @@
             <span id="syncBadge" class="text-[10px] bg-emerald-950 border border-emerald-800/80 text-emerald-300 px-2 py-0.5 rounded-full font-mono">ACTIVE</span>
         </div>
 
+        <!-- Real-Time Cross-Device Activity Ticker -->
+        <div id="liveActivityTicker" class="hidden bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] rounded-xl p-2.5 flex items-center justify-between shadow-sm animate-pulse">
+            <span class="flex items-center gap-2 truncate">
+                <i class="fa-solid fa-bolt-lightning text-amber-400 text-xs shrink-0"></i>
+                <span id="liveTickerText" class="truncate font-medium">Real-time sync active across all devices.</span>
+            </span>
+            <span class="text-[9px] font-bold text-emerald-400 bg-emerald-900/80 border border-emerald-700/60 px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">LIVE UPDATE</span>
+        </div>
+
         <!-- User Identity Bar -->
         <div class="bg-[#111b21] border border-slate-800 rounded-xl p-3 space-y-2 shadow-sm">
             <div class="flex items-center justify-between">
@@ -301,6 +310,12 @@
                         <i class="fa-solid fa-circle-check"></i> Identity Verified
                     </span>
                     <span class="text-xs text-slate-300 block">Select your desired letter from the remaining unpicked letters:</span>
+                </div>
+
+                <!-- Real-Time Race Condition / Taken Letter Warning Banner -->
+                <div id="step3ConflictAlert" class="hidden bg-amber-950/70 border border-amber-500/60 rounded-xl p-2.5 text-xs text-amber-200 flex items-start gap-2 shadow-md">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400 text-sm mt-0.5 shrink-0"></i>
+                    <span id="step3ConflictText" class="leading-tight">A letter you selected was just claimed by another participant on a different device! We've updated the available choices below.</span>
                 </div>
 
                 <div>
@@ -736,8 +751,19 @@
 
             const unpicked = LETTERS.filter(l => !currentRound.picks || !currentRound.picks[l]);
 
+            // Check if user's previously targeted letter was claimed by another participant in real-time
+            if (selectedTargetLetter && !unpicked.includes(selectedTargetLetter)) {
+                const conflictAlert = document.getElementById('step3ConflictAlert');
+                const conflictText = document.getElementById('step3ConflictText');
+                if (conflictAlert && conflictText) {
+                    conflictText.innerText = `Letter ${selectedTargetLetter} was just claimed by another participant in real-time! Please pick another letter.`;
+                    conflictAlert.classList.remove('hidden');
+                }
+                selectedTargetLetter = unpicked.length > 0 ? unpicked[0] : null;
+            }
+
             if (unpicked.length === 0) {
-                grid.innerHTML = `<div class="col-span-4 text-center text-xs text-amber-400 py-2">No letters remaining in this round!</div>`;
+                grid.innerHTML = `<div class="col-span-4 text-center text-xs text-amber-400 py-2">No letters remaining in this round! All letters have been claimed.</div>`;
                 return;
             }
 
@@ -754,6 +780,8 @@
                     : "py-2 px-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-slate-300 font-bold text-sm transition";
                 btn.innerText = letter;
                 btn.onclick = () => {
+                    const conflictAlert = document.getElementById('step3ConflictAlert');
+                    if (conflictAlert) conflictAlert.classList.add('hidden');
                     selectedTargetLetter = letter;
                     renderModalRemainingLetters();
                 };
@@ -790,8 +818,10 @@
 
                         const roundData = docSnap.data();
                         
+                        // Strict Real-Time Check inside Atomic Transaction
                         if (roundData.picks && roundData.picks[targetLetter]) {
-                            throw new Error(`Letter ${targetLetter} was just claimed by someone else!`);
+                            const claimedBy = roundData.picks[targetLetter].name || "Another participant";
+                            throw new Error(`Letter ${targetLetter} was just claimed by ${claimedBy} on another device!`);
                         }
 
                         const picksList = Object.values(roundData.picks || {});
@@ -854,7 +884,15 @@
                     renderAll();
                 }
             } catch (err) {
-                window.showAlert(err.message || "Could not claim letter. Please try again.", "Error");
+                const conflictAlert = document.getElementById('step3ConflictAlert');
+                const conflictText = document.getElementById('step3ConflictText');
+                if (conflictAlert && conflictText) {
+                    conflictText.innerText = err.message || "That letter was taken on another device! Please choose another letter.";
+                    conflictAlert.classList.remove('hidden');
+                } else {
+                    window.showAlert(err.message || "Could not claim letter. Please try again.", "Error");
+                }
+                window.showStep3LetterSelection();
             } finally {
                 isSubmitting = false;
                 if (confirmBtn) confirmBtn.disabled = false;
@@ -928,9 +966,23 @@
 
                     onSnapshot(activeDocRef(), (snapshot) => {
                         if (snapshot.exists()) {
+                            const previousPicksCount = Object.keys(currentRound.picks || {}).length;
                             currentRound = snapshot.data();
                             saveLocalRound(currentRound, false);
+                            
                             renderAll();
+
+                            // Dynamically update Step 3 grid if user is currently inside the selection modal
+                            const modal = document.getElementById('claimModal');
+                            if (modal && !modal.classList.contains('hidden')) {
+                                renderModalRemainingLetters();
+                            }
+
+                            // Show live ticker notification if a letter was claimed on another device
+                            const currentPicksCount = Object.keys(currentRound.picks || {}).length;
+                            if (currentPicksCount > previousPicksCount) {
+                                showLiveActivityToast(currentRound);
+                            }
                         } else {
                             createNewRound(1001);
                         }
@@ -952,6 +1004,26 @@
                 }
             }
         });
+
+        function showLiveActivityToast(roundData) {
+            const ticker = document.getElementById('liveActivityTicker');
+            const tickerText = document.getElementById('liveTickerText');
+            if (!ticker || !tickerText || !roundData.picks) return;
+
+            const picksArray = Object.values(roundData.picks);
+            if (picksArray.length === 0) return;
+
+            // Get the latest pick
+            const latestPick = picksArray[picksArray.length - 1];
+            const letter = findLetterByPick(latestPick);
+
+            tickerText.innerText = `⚡ Letter ${letter} was just claimed by ${escapeHtml(latestPick.name)} on another device!`;
+            ticker.classList.remove('hidden');
+
+            setTimeout(() => {
+                if (ticker) ticker.classList.add('hidden');
+            }, 6000);
+        }
 
         function createNewRound(roundIdNumber) {
             const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
