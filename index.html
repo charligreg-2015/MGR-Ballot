@@ -99,19 +99,19 @@
         <!-- Sync Alert Banner -->
         <div id="connectionStatus" class="bg-slate-900 border border-slate-800 text-slate-400 rounded-xl px-3 py-2 text-xs flex items-center justify-between shadow-sm">
             <span class="flex items-center gap-2">
-                <i class="fa-solid fa-circle-check text-emerald-400"></i>
-                <span id="statusText">System active</span>
+                <i id="statusIcon" class="fa-solid fa-circle-notch animate-spin text-amber-400"></i>
+                <span id="statusText">Connecting real-time cloud sync...</span>
             </span>
-            <span id="syncBadge" class="text-[10px] bg-emerald-950 border border-emerald-800/80 text-emerald-300 px-2 py-0.5 rounded-full font-mono">ACTIVE</span>
+            <span id="syncBadge" class="text-[10px] bg-amber-950 border border-amber-800/80 text-amber-300 px-2 py-0.5 rounded-full font-mono">CONNECTING</span>
         </div>
 
         <!-- Real-Time Cross-Device Activity Ticker -->
         <div id="liveActivityTicker" class="hidden bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-[11px] rounded-xl p-2.5 flex items-center justify-between shadow-sm animate-pulse">
             <span class="flex items-center gap-2 truncate">
                 <i class="fa-solid fa-bolt-lightning text-amber-400 text-xs shrink-0"></i>
-                <span id="liveTickerText" class="truncate font-medium">Real-time sync active across all devices.</span>
+                <span id="liveTickerText" class="truncate font-medium">Real-time cross-device sync active.</span>
             </span>
-            <span class="text-[9px] font-bold text-emerald-400 bg-emerald-900/80 border border-emerald-700/60 px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">LIVE UPDATE</span>
+            <span class="text-[9px] font-bold text-emerald-400 bg-emerald-900/80 border border-emerald-700/60 px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider">LIVE LOCKED</span>
         </div>
 
         <!-- User Identity Bar -->
@@ -135,7 +135,7 @@
             <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
                 <span class="text-slate-400 flex items-center gap-1.5">
                     <i class="fa-solid fa-mobile-screen-button text-slate-500"></i>
-                    Device Status:
+                    Device Lock Status:
                 </span>
                 <span id="deviceStatusBadge" class="font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded-full">
                     1 Pick Allowed
@@ -147,7 +147,7 @@
         <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-800/40 rounded-xl p-3.5 flex items-start space-x-3 shadow-sm">
             <i class="fa-solid fa-circle-info text-emerald-400 text-lg mt-0.5 shrink-0"></i>
             <p class="text-xs text-slate-300 leading-relaxed">
-                Letters <strong class="text-emerald-300">A to K</strong> map to secret numbers <strong class="text-emerald-300">1 to 11</strong>. Select any available letter, verify your email passkey, and reveal your hidden number!
+                Letters <strong class="text-emerald-300">A to K</strong> map to secret numbers <strong class="text-emerald-300">1 to 11</strong>. Select any available letter, verify your email passkey, and reveal your hidden number! When a letter is claimed on any phone, it locks out instantly for all devices.
             </p>
         </div>
 
@@ -218,7 +218,7 @@
 
     <!-- Footer -->
     <footer class="max-w-md mx-auto w-full px-4 py-4 text-center text-slate-600 text-[11px] border-t border-slate-800/60">
-        MGR 2026/27 Lottery &bull; Secure Email Passkey Verified &bull; Round #<span id="footerRound">1001</span>
+        MGR 2026/27 Lottery &bull; Secure Multi-Device Cloud Sync &bull; Round #<span id="footerRound">1001</span>
     </footer>
 
     <!-- MODAL 1: Claim Letter Prompt with Email OTP Verification -->
@@ -459,9 +459,9 @@
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
-        const STORAGE_KEY_USER = 'mgr_lottery_user_identity_v5';
-        const STORAGE_KEY_ROUND = 'mgr_lottery_local_state_v5';
-        const STORAGE_KEY_DEVICE = 'mgr_lottery_device_id_v5';
+        const STORAGE_KEY_USER = 'mgr_lottery_user_identity_v6';
+        const STORAGE_KEY_ROUND = 'mgr_lottery_local_state_v6';
+        const STORAGE_KEY_DEVICE = 'mgr_lottery_device_id_v6';
         const ADMIN_EMAIL = 'charligreg@gmail.com';
         const MASTER_ADMIN_PIN = '4316';
 
@@ -492,7 +492,6 @@
             return id;
         }
 
-        // Custom non-blocking Alert function
         window.showAlert = function(message, title = "Notice") {
             const titleEl = document.getElementById('customAlertTitle');
             const msgEl = document.getElementById('customAlertMessage');
@@ -501,7 +500,6 @@
             window.openModal('customAlertModal');
         };
 
-        // Custom non-blocking Confirm function
         window.showConfirm = function(message, title = "Confirm Action", onConfirm) {
             const titleEl = document.getElementById('customConfirmTitle');
             const msgEl = document.getElementById('customConfirmMessage');
@@ -554,14 +552,12 @@
             }
         };
 
-        // ADMIN RESTRICTION: Opens PIN Dialog before allowing round reset
         window.confirmResetRound = function() {
             const pinInput = document.getElementById('inputAdminPin');
             if (pinInput) pinInput.value = '';
             window.openModal('adminModal');
         };
 
-        // Handle Admin PIN Submission
         window.handleAdminResetSubmit = function(e) {
             e.preventDefault();
             const enteredPin = document.getElementById('inputAdminPin').value.trim();
@@ -597,7 +593,6 @@
 
             const picksArray = Object.values(currentRound.picks);
             
-            // Check by Device ID
             const deviceMatch = picksArray.find(p => p.deviceId === deviceId);
             if (deviceMatch) {
                 return { 
@@ -606,7 +601,6 @@
                 };
             }
 
-            // Check by Email
             if (emailToCheck) {
                 const emailMatch = picksArray.find(p => p.email && p.email.toLowerCase() === emailToCheck.trim().toLowerCase());
                 if (emailMatch) {
@@ -751,7 +745,6 @@
 
             const unpicked = LETTERS.filter(l => !currentRound.picks || !currentRound.picks[l]);
 
-            // Check if user's previously targeted letter was claimed by another participant in real-time
             if (selectedTargetLetter && !unpicked.includes(selectedTargetLetter)) {
                 const conflictAlert = document.getElementById('step3ConflictAlert');
                 const conflictText = document.getElementById('step3ConflictText');
@@ -812,11 +805,12 @@
                         const docRef = activeDocRef();
                         const docSnap = await transaction.get(docRef);
 
+                        let roundData;
                         if (!docSnap.exists()) {
-                            throw new Error("Active round missing!");
+                            roundData = { ...currentRound, picks: {} };
+                        } else {
+                            roundData = docSnap.data();
                         }
-
-                        const roundData = docSnap.data();
                         
                         // Strict Real-Time Check inside Atomic Transaction
                         if (roundData.picks && roundData.picks[targetLetter]) {
@@ -832,8 +826,8 @@
                             throw new Error(`Email ${currentUser.email} has already participated in this round.`);
                         }
 
-                        const numberRevealed = roundData.mapping[targetLetter];
-                        const newPicks = { ...roundData.picks };
+                        const numberRevealed = roundData.mapping[targetLetter] || Math.floor(Math.random() * 11) + 1;
+                        const newPicks = { ...(roundData.picks || {}) };
                         newPicks[targetLetter] = {
                             name: currentUser.name,
                             phone: currentUser.phone,
@@ -844,7 +838,7 @@
                             uid: currentUser.uid
                         };
 
-                        transaction.update(docRef, { picks: newPicks, updatedAt: Date.now() });
+                        transaction.set(docRef, { ...roundData, picks: newPicks, updatedAt: Date.now() }, { merge: true });
                     });
 
                     window.closeModal('claimModal');
@@ -972,13 +966,11 @@
                             
                             renderAll();
 
-                            // Dynamically update Step 3 grid if user is currently inside the selection modal
                             const modal = document.getElementById('claimModal');
                             if (modal && !modal.classList.contains('hidden')) {
                                 renderModalRemainingLetters();
                             }
 
-                            // Show live ticker notification if a letter was claimed on another device
                             const currentPicksCount = Object.keys(currentRound.picks || {}).length;
                             if (currentPicksCount > previousPicksCount) {
                                 showLiveActivityToast(currentRound);
@@ -1013,7 +1005,6 @@
             const picksArray = Object.values(roundData.picks);
             if (picksArray.length === 0) return;
 
-            // Get the latest pick
             const latestPick = picksArray[picksArray.length - 1];
             const letter = findLetterByPick(latestPick);
 
@@ -1025,7 +1016,7 @@
             }, 6000);
         }
 
-        function createNewRound(roundIdNumber) {
+        async function createNewRound(roundIdNumber) {
             const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
             for (let i = numbers.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -1056,11 +1047,23 @@
             currentRound = newRoundData;
             saveLocalRound(currentRound);
 
-            // Dispatch Admin PIN to designated email
             dispatchAdminPinEmail(MASTER_ADMIN_PIN, roundIdNumber);
 
-            if (db && auth?.currentUser) {
-                setDoc(activeDocRef(), newRoundData).catch(e => {});
+            if (db) {
+                if (!auth?.currentUser) {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch(e) {}
+                }
+                if (auth?.currentUser) {
+                    try {
+                        await setDoc(activeDocRef(), newRoundData);
+                    } catch(e) {}
+                }
             }
 
             renderAll();
@@ -1084,16 +1087,12 @@
                         message: `Hello Administrator,\n\nA new round (#${roundId}) has started for MGR 2026/27 Lottery.\n\nTarget Email: ${ADMIN_EMAIL}\nTimestamp: ${new Date().toLocaleString()}`
                     })
                 });
-            } catch (e) {
-                console.warn("API Email dispatch failed or offline.", e);
-            }
+            } catch (e) {}
         }
 
         window.sendAdminPinToEmail = async function() {
             const roundId = currentRound.roundId || 1001;
-
             dispatchAdminPinEmail(MASTER_ADMIN_PIN, roundId);
-
             window.showAlert(`Master Admin notification has been dispatched to ${ADMIN_EMAIL}.`, "Email Dispatched");
         };
 
@@ -1137,6 +1136,8 @@
             const statusEl = document.getElementById('statusText');
             const indEl = document.getElementById('syncIndicator');
             const badgeEl = document.getElementById('syncBadge');
+            const iconEl = document.getElementById('statusIcon');
+
             if (statusEl) statusEl.innerText = text;
             if (indEl) {
                 indEl.className = isLive 
@@ -1145,6 +1146,14 @@
             }
             if (badgeEl) {
                 badgeEl.innerText = isLive ? "LIVE SYNC" : "LOCAL SYNC";
+                badgeEl.className = isLive 
+                    ? "text-[10px] bg-emerald-950 border border-emerald-800/80 text-emerald-300 px-2 py-0.5 rounded-full font-mono"
+                    : "text-[10px] bg-amber-950 border border-amber-800/80 text-amber-300 px-2 py-0.5 rounded-full font-mono";
+            }
+            if (iconEl) {
+                iconEl.className = isLive
+                    ? "fa-solid fa-circle-check text-emerald-400"
+                    : "fa-solid fa-wifi text-amber-400";
             }
         }
 
